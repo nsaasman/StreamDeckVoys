@@ -27,6 +27,13 @@ npm start
 | `build-and-update.bat` | Bouwt en kopieert naar `%APPDATA%\Elgato\StreamDeck\Plugins\` |
 | `build-release.bat` | Publieke `.streamDeckPlugin` in `dist/` |
 
+## Contributors
+
+- [@nsaasman](https://github.com/nsaasman) — maintainer
+- [Cursor](https://github.com/cursoragent) — AI-assisted development
+
+Zie ook [CONTRIBUTORS.md](CONTRIBUTORS.md).
+
 ## Licentie
 
 MIT
