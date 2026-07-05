@@ -4,7 +4,7 @@ Stream Deck-plugin om de beschikbaarheidsstatus van Voys-collega's te tonen en j
 
 ## Installatie (gebruikers)
 
-1. Download **`voys-collega-status.streamDeckPlugin`** uit de GitHub Releases (of bouw lokaal met `build-release.bat`).
+1. Download **`voys-collega-status.streamDeckPlugin`** uit [Releases](https://github.com/nsaasman/StreamDeckVoys/releases) (of bouw lokaal met `build-release.bat`).
 2. Dubbelklik het bestand — Stream Deck installeert de plugin automatisch.
 3. Open de plugin-instellingen in Stream Deck en vul je **Voys API-token** in.
 4. Klik **Detecteer client_id** of vul handmatig **Client UUID** en **Client ID** in.
