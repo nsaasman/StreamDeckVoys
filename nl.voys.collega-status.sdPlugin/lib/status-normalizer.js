@@ -100,3 +100,12 @@ class StatusNormalizer {
 }
 
 module.exports = StatusNormalizer;
+
+if (require.main === module) {
+  const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
+  const n = new StatusNormalizer();
+  assert(n.normalize({ availability: "available", context: { data: ["in_call"] } }).label === "Bezet", "in_call");
+  assert(n.normalize({ dnd: true }).state === 2, "dnd");
+  assert(n.normalize(null).state === 4, "null");
+  console.log("status-normalizer ok");
+}

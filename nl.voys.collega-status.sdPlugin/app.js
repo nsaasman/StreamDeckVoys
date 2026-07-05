@@ -6,6 +6,30 @@ function logError(msg) {
   try { fs.appendFileSync(path.join(__dirname, "plugin.log"), `[${new Date().toISOString()}] ${msg}\n`); } catch {}
 }
 
+function isSensitiveKey(key) {
+  const k = String(key).toLowerCase();
+  return k.includes("token") || k === "password" || k === "authorization";
+}
+
+function sanitizeForLog(value) {
+  if (value == null || typeof value !== "object") {
+    if (typeof value === "string" && value.startsWith("data:image")) return "<image>";
+    return value;
+  }
+  if (Array.isArray(value)) return value.map(sanitizeForLog);
+  const out = {};
+  for (const [k, v] of Object.entries(value)) {
+    if (isSensitiveKey(k)) {
+      out[k] = v ? "<redacted>" : v;
+    } else if (k === "image" && typeof v === "string" && v.startsWith("data:image")) {
+      out[k] = "<image>";
+    } else {
+      out[k] = sanitizeForLog(v);
+    }
+  }
+  return out;
+}
+
 process.on("uncaughtException", (err) => {
   logError(`FATAL: ${err.message}\n${err.stack}`);
   process.stderr.write(`FATAL: ${err.message}\n`);
@@ -63,6 +87,8 @@ let ws = null;
 let registrationInfo = null;
 let ownUserCache = null;
 const callDebounce = new Map();
+const flashTimers = new Map();
+const unresolvedInternalNumbers = new Set();
 const CALL_DEBOUNCE_MS = 2000;
 const CALL_FEEDBACK_MS = 1500;
 
@@ -82,9 +108,9 @@ function connect() {
   });
 
   ws.on("message", (raw) => {
-    logError(`RAW RECV: ${raw.toString()}`);
     try {
       const msg = JSON.parse(raw.toString());
+      logError(`WS RECV: ${JSON.stringify(sanitizeForLog(msg))}`);
       handleMessage(msg);
     } catch (err) {
       logError(`JSON Parse Error: ${err.message}`);
@@ -106,7 +132,7 @@ function send(context, payload) {
       const actionId = settingsStore.getAction(context, "_actionId");
       if (actionId) message.action = actionId;
     }
-    logError(`RAW SEND: ${JSON.stringify(message)}`);
+    logError(`WS SEND: ${JSON.stringify(sanitizeForLog(message))}`);
     ws.send(JSON.stringify(message));
   }
 }
@@ -167,8 +193,9 @@ function handleMessage(msg) {
 function handleGlobalSettings(settings) {
   settingsStore.replaceGlobal(settings);
   ownUserCache = null;
+  unresolvedInternalNumbers.clear();
   statusService.setOwnUserUuid(null);
-  const wasRunning = statusService._running;
+  const wasRunning = statusService.isRunning();
   statusService.stop();
   statusService.invalidate();
   if (wasRunning || Object.keys(settings).length > 0) {
@@ -216,6 +243,12 @@ function handleWillAppear(context, payload, actionFromMsg) {
 }
 
 function handleWillDisappear(context) {
+  const flashTimer = flashTimers.get(context);
+  if (flashTimer) {
+    clearTimeout(flashTimer);
+    flashTimers.delete(context);
+  }
+  callDebounce.delete(context);
   settingsStore.removeAction(context);
 }
 
@@ -240,7 +273,7 @@ function handleKeyDown(context, actionFromMsg) {
 }
 
 function handlePropertyInspectorMessage(context, payload) {
-  logError(`PI Message: ${JSON.stringify(payload)}`);
+  logError(`PI Message: ${JSON.stringify(sanitizeForLog(payload))}`);
   const action = payload.action;
 
   if (payload.globalSettings) {
@@ -258,6 +291,7 @@ function handlePropertyInspectorMessage(context, payload) {
         showNumber: payload.showNumber,
       };
       settingsStore.setAction(context, actionData);
+      if (actionData.internalNumber) unresolvedInternalNumbers.delete(actionData.userUuid);
       saveActionSettings(context);
       
       const cached = statusService.getCachedStatus(actionData.userUuid);
@@ -346,18 +380,17 @@ function handlePropertyInspectorMessage(context, payload) {
     case "saveGlobalToken": {
       const newSettings = {
         api_token: payload.api_token,
-        auth_type: payload.auth_type,
         client_uuid: payload.client_uuid,
         client_id: payload.client_id,
         voys_base_url: payload.voys_base_url,
         resgate_url: payload.resgate_url,
-        polling_interval: payload.polling_interval,
         click_to_dial_base_url: payload.click_to_dial_base_url,
         user_email: payload.user_email,
       };
-      settingsStore.setGlobal(newSettings);
+      settingsStore.replaceGlobal(newSettings);
       saveGlobalSettings();
       ownUserCache = null;
+      unresolvedInternalNumbers.clear();
       statusService.setOwnUserUuid(null);
       statusService.stop();
       statusService.invalidate();
@@ -413,6 +446,7 @@ function pickInternalNumber(user) {
 async function resolveColleagueInternalNumber(context, settings) {
   let num = String(settings.internalNumber || "").trim();
   if (num || !settings.userUuid) return num;
+  if (unresolvedInternalNumbers.has(settings.userUuid)) return "";
 
   const clientId = settingsStore.getClientId();
   if (!clientId) return "";
@@ -424,6 +458,8 @@ async function resolveColleagueInternalNumber(context, settings) {
   if (num) {
     settingsStore.setAction(context, { internalNumber: num });
     saveActionSettings(context);
+  } else {
+    unresolvedInternalNumbers.add(settings.userUuid);
   }
   return num;
 }
@@ -472,12 +508,17 @@ function flashColleagueTitle(context, title) {
   const cached = settings.userUuid ? statusService.getCachedStatus(settings.userUuid) : null;
   const status = cached || StatusNormalizer.getUnknown();
   setButtonState(context, status, title);
-  setTimeout(() => {
+
+  const prev = flashTimers.get(context);
+  if (prev) clearTimeout(prev);
+  const timer = setTimeout(() => {
+    flashTimers.delete(context);
     const current = settingsStore.getAction(context);
     if (!current.userUuid) return;
     const restored = statusService.getCachedStatus(current.userUuid) || status;
     setButtonState(context, restored);
   }, CALL_FEEDBACK_MS);
+  flashTimers.set(context, timer);
 }
 
 async function refreshAllCycleButtons() {
@@ -599,7 +640,9 @@ function buildTitle(status, context) {
 let lastOwnDestKey = null;
 statusService.setOnStatusUpdate((normalized, error) => {
   if (error) {
-    broadcastStatus(error.type === "auth_error" ? StatusNormalizer.getAuthError() : StatusNormalizer.getConfig());
+    applyConnectionErrorStatus(
+      error.type === "auth_error" ? StatusNormalizer.getAuthError() : StatusNormalizer.getConfig()
+    );
     return;
   }
 
@@ -635,9 +678,18 @@ statusService.setOnStatusUpdate((normalized, error) => {
   }
 });
 
-function broadcastStatus(status) {
-  for (const [context] of settingsStore.getAllActions()) {
-    setButtonState(context, status);
+function applyConnectionErrorStatus(status) {
+  for (const [context, settings] of settingsStore.getAllActions()) {
+    const actionId = settings._actionId || ACTIONS.COLLEAGUE;
+    if (actionId === ACTIONS.CYCLE_STATUS || actionId === ACTIONS.CYCLE_DESTINATION) {
+      setButtonState(context, status, status.label);
+      continue;
+    }
+    if (!settings.userUuid) {
+      setButtonState(context, status);
+      continue;
+    }
+    setButtonState(context, statusService.getCachedStatus(settings.userUuid));
   }
 }
 

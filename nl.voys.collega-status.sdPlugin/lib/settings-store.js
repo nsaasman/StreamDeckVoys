@@ -70,11 +70,6 @@ class SettingsStore {
     return this._globalSettings.user_email || this._globalSettings.click_to_dial_email || "";
   }
 
-  getPollingInterval() {
-    const interval = parseInt(this._globalSettings.polling_interval, 10);
-    return isNaN(interval) || interval < 5 ? 15000 : interval * 1000;
-  }
-
   getSelectedUuids() {
     const uuids = [];
     for (const [, settings] of this._actionSettings) {

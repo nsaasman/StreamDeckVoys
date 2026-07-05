@@ -56,11 +56,12 @@ class ClickToDialClient {
     });
 
     const timeoutMs = options.timeout || 15000;
+    let timer;
     const absoluteTimeout = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("Request timed out")), timeoutMs);
+      timer = setTimeout(() => reject(new Error("Request timed out")), timeoutMs);
     });
 
-    return Promise.race([requestPromise, absoluteTimeout]);
+    return Promise.race([requestPromise, absoluteTimeout]).finally(() => clearTimeout(timer));
   }
 
   buildAuthHeader(email, token) {

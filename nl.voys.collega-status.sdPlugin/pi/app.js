@@ -17,7 +17,6 @@ const els = {
   userEmail: document.getElementById("user-email"),
   clientUuid: document.getElementById("client-uuid"),
   clientId: document.getElementById("client-id"),
-  pollingInterval: document.getElementById("polling-interval"),
   btnTestConnection: document.getElementById("btn-test-connection"),
   btnDetectClient: document.getElementById("btn-detect-client"),
   btnSaveGlobal: document.getElementById("btn-save-global"),
@@ -117,14 +116,14 @@ function send(payload) {
 }
 
 function sendToPlugin(payload) {
-  if (!pluginUUID) {
-    showStatus(els.connectionStatus, false, "Geen Stream Deck context beschikbaar. Sluit en open de Property Inspector opnieuw.");
+  if (!actionContext) {
+    showStatus(els.connectionStatus, false, "Geen knop-context beschikbaar. Sluit en open de Property Inspector opnieuw.");
     return;
   }
   const msg = {
     action: pluginAction,
     event: "sendToPlugin",
-    context: pluginUUID,
+    context: actionContext,
     payload: payload,
   };
   send(msg);
@@ -135,8 +134,8 @@ function requestGlobalSettings() {
 }
 
 function requestActionSettings() {
-  if (!pluginUUID) return;
-  send({ event: "getSettings", context: pluginUUID });
+  if (!actionContext) return;
+  send({ event: "getSettings", context: actionContext });
 }
 
 function loadGlobalSettings(settings) {
@@ -147,7 +146,6 @@ function loadGlobalSettings(settings) {
   if (settings.user_email) els.userEmail.value = settings.user_email;
   if (settings.client_uuid) els.clientUuid.value = settings.client_uuid;
   if (settings.client_id) els.clientId.value = settings.client_id;
-  if (settings.polling_interval) els.pollingInterval.value = settings.polling_interval;
 }
 
 function loadActionSettings(settings) {
@@ -223,28 +221,34 @@ function populateUsers(users) {
 
 function showColleagueInfo(userUuid) {
   const user = loadedUsers.find((u) => u.id === userUuid);
-  if (user) {
-    els.colleagueInfo.innerHTML =
-      "<strong>" +
-      (user.name || "Onbekend") +
-      "</strong>" +
-      (user.email_address ? "<br>" + user.email_address : "") +
-      (user.internal_number ? "<br>Intern: " + user.internal_number : "");
-    els.colleagueInfo.classList.add("visible");
+  els.colleagueInfo.replaceChildren();
+  if (!user) {
+    els.colleagueInfo.classList.remove("visible");
+    return;
   }
+  const name = document.createElement("strong");
+  name.textContent = user.name || "Onbekend";
+  els.colleagueInfo.appendChild(name);
+  if (user.email_address) {
+    els.colleagueInfo.appendChild(document.createElement("br"));
+    els.colleagueInfo.appendChild(document.createTextNode(user.email_address));
+  }
+  if (user.internal_number) {
+    els.colleagueInfo.appendChild(document.createElement("br"));
+    els.colleagueInfo.appendChild(document.createTextNode("Intern: " + user.internal_number));
+  }
+  els.colleagueInfo.classList.add("visible");
 }
 
 function collectGlobalSettings() {
   return {
     api_token: els.apiToken.value.trim(),
-    auth_type: "Bearer",
     voys_base_url: els.voysBaseUrl.value.trim(),
     resgate_url: els.resgateUrl.value.trim(),
     click_to_dial_base_url: els.clickToDialUrl.value.trim(),
     user_email: els.userEmail.value.trim(),
     client_uuid: els.clientUuid.value.trim(),
     client_id: els.clientId.value.trim(),
-    polling_interval: els.pollingInterval.value,
   };
 }
 
@@ -276,14 +280,12 @@ els.btnSaveGlobal.addEventListener("click", function () {
   sendToPlugin({
     action: "saveGlobalToken",
     api_token: settings.api_token,
-    auth_type: settings.auth_type,
     client_uuid: settings.client_uuid,
     client_id: settings.client_id,
     voys_base_url: settings.voys_base_url,
     resgate_url: settings.resgate_url,
     click_to_dial_base_url: settings.click_to_dial_base_url,
     user_email: settings.user_email,
-    polling_interval: settings.polling_interval,
   });
   showStatus(els.connectionStatus, true, "Opgeslagen");
 });

@@ -57,6 +57,10 @@ class StatusService {
     this._resgate.stop();
   }
 
+  isRunning() {
+    return this._running;
+  }
+
   forceRefresh() {
     if (!this._running) return;
     this._authFailed = false;

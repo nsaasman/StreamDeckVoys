@@ -59,13 +59,13 @@ class VoysApiClient {
       req.end();
     });
 
-    // Enforce an absolute timeout to prevent hanging UI
     const timeoutMs = options.timeout || 15000;
+    let timer;
     const absoluteTimeout = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("Request timed out (absolute)")), timeoutMs);
+      timer = setTimeout(() => reject(new Error("Request timed out (absolute)")), timeoutMs);
     });
 
-    return Promise.race([requestPromise, absoluteTimeout]);
+    return Promise.race([requestPromise, absoluteTimeout]).finally(() => clearTimeout(timer));
   }
 
   async validateAuth() {
