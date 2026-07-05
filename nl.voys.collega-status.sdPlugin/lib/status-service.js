@@ -1,8 +1,6 @@
 const ResgateClient = require("./resgate-client");
 const StatusNormalizer = require("./status-normalizer");
 
-const STALE_TIMEOUT = 60000;
-
 class StatusService {
   constructor(settingsStore) {
     this._settings = settingsStore;
@@ -13,6 +11,7 @@ class StatusService {
     this._onStatusUpdate = null;
     this._running = false;
     this._ownUserUuid = null;
+    this._disconnected = false;
 
     this._resgate.setOnUpdate(() => this._handleModelUpdate());
     this._resgate.setOnConnectionChange((state) => this._handleConnectionChange(state));
@@ -61,10 +60,9 @@ class StatusService {
     return this._running;
   }
 
-  forceRefresh() {
-    if (!this._running) return;
-    this._authFailed = false;
-    this._resgate.forceReconnect();
+  // Hernormaliseer uit de al ontvangen resgate-modellen, zonder reconnect.
+  recompute() {
+    this._handleModelUpdate();
   }
 
   invalidate() {
@@ -74,8 +72,8 @@ class StatusService {
   getCachedStatus(userUuid) {
     const cached = this._cache.get(userUuid);
     if (!cached) return StatusNormalizer.getUnknown();
-    const age = Date.now() - cached.fetchedAt;
-    return { ...cached.status, stale: age > STALE_TIMEOUT };
+    // Push-model: status is vers zolang de verbinding leeft, hoe oud die ook is.
+    return { ...cached.status, stale: this._disconnected };
   }
 
   _handleModelUpdate() {
@@ -100,6 +98,11 @@ class StatusService {
   }
 
   _handleConnectionChange(state) {
+    if (state.type === "connected") {
+      this._disconnected = false;
+      return;
+    }
+
     if (state.type === "config") {
       if (this._onStatusUpdate) this._onStatusUpdate(null, { type: "config" });
       return;
@@ -112,6 +115,7 @@ class StatusService {
     }
 
     if (state.type === "disconnected") {
+      this._disconnected = true;
       this._markStale();
     }
   }

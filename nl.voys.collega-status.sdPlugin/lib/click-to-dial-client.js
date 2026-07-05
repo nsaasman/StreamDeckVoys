@@ -28,11 +28,14 @@ class ClickToDialClient {
       reqOptions.headers["Content-Length"] = Buffer.byteLength(bodyStr);
     }
 
-    const requestPromise = new Promise((resolve, reject) => {
+    const timeoutMs = options.timeout || 15000;
+
+    return new Promise((resolve, reject) => {
       const req = https.request(reqOptions, (res) => {
         const chunks = [];
         res.on("data", (chunk) => chunks.push(chunk));
         res.on("end", () => {
+          clearTimeout(absTimer);
           const body = Buffer.concat(chunks).toString("utf8");
           let data;
           try {
@@ -44,24 +47,19 @@ class ClickToDialClient {
         });
       });
 
-      req.on("timeout", () => {
-        req.destroy();
-        reject(new Error("Request timed out"));
-      });
+      // destroy(err) laat het 'error'-event vuren en ruimt de socket echt op.
+      const absTimer = setTimeout(() => req.destroy(new Error("Request timed out")), timeoutMs);
 
-      req.on("error", (err) => reject(err));
+      req.on("timeout", () => req.destroy(new Error("Request timed out")));
+
+      req.on("error", (err) => {
+        clearTimeout(absTimer);
+        reject(err);
+      });
 
       if (bodyStr) req.write(bodyStr);
       req.end();
     });
-
-    const timeoutMs = options.timeout || 15000;
-    let timer;
-    const absoluteTimeout = new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Error("Request timed out")), timeoutMs);
-    });
-
-    return Promise.race([requestPromise, absoluteTimeout]).finally(() => clearTimeout(timer));
   }
 
   buildAuthHeader(email, token) {

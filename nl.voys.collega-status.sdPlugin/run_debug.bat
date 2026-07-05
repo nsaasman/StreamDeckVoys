@@ -12,5 +12,6 @@ if not exist "node_modules\ws" (
     echo Eerste keer - dependencies installeren...
     call npm install --production --no-audit --no-fund
 )
+set VOYS_DEBUG=1
 node "%~dp0\app.js" %*
 ENDLOCAL

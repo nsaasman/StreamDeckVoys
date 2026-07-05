@@ -9,8 +9,6 @@ const STATUS_MAP = {
 const UNKNOWN_STATUS = { state: 4, label: "\u2753", color: "#454d63" };
 const AUTH_ERROR = { state: 5, label: "Auth", color: "#dc3545" };
 const CONFIG = { state: 6, label: "Config", color: "#353c4d" };
-const MISSING = { state: 7, label: "??", color: "#454d63" };
-const LOADING = { state: 4, label: "...", color: "#454d63" };
 const BUSY = { state: 2, label: "Bezet", color: "#dc3545" };
 
 class StatusNormalizer {
@@ -84,14 +82,6 @@ class StatusNormalizer {
 
   static getConfig() {
     return { ...CONFIG };
-  }
-
-  static getMissing() {
-    return { ...MISSING };
-  }
-
-  static getLoading() {
-    return { ...LOADING };
   }
 
   static getUnknown() {

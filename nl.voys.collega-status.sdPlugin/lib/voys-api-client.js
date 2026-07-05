@@ -29,11 +29,14 @@ class VoysApiClient {
       timeout: options.timeout || 15000,
     };
 
-    const requestPromise = new Promise((resolve, reject) => {
+    const timeoutMs = options.timeout || 15000;
+
+    return new Promise((resolve, reject) => {
       const req = https.request(reqOptions, (res) => {
         const chunks = [];
         res.on("data", (chunk) => chunks.push(chunk));
         res.on("end", () => {
+          clearTimeout(absTimer);
           const body = Buffer.concat(chunks).toString("utf8");
           let data;
           try {
@@ -45,12 +48,15 @@ class VoysApiClient {
         });
       });
 
-      req.on("timeout", () => {
-        req.destroy();
-        reject(new Error("Request timed out (socket inactivity)"));
-      });
+      // destroy(err) laat het 'error'-event vuren en ruimt de socket echt op.
+      const absTimer = setTimeout(() => req.destroy(new Error("Request timed out (absolute)")), timeoutMs);
 
-      req.on("error", (err) => reject(err));
+      req.on("timeout", () => req.destroy(new Error("Request timed out (socket inactivity)")));
+
+      req.on("error", (err) => {
+        clearTimeout(absTimer);
+        reject(err);
+      });
 
       if (options.body) {
         req.write(JSON.stringify(options.body));
@@ -58,14 +64,6 @@ class VoysApiClient {
 
       req.end();
     });
-
-    const timeoutMs = options.timeout || 15000;
-    let timer;
-    const absoluteTimeout = new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Error("Request timed out (absolute)")), timeoutMs);
-    });
-
-    return Promise.race([requestPromise, absoluteTimeout]).finally(() => clearTimeout(timer));
   }
 
   async validateAuth() {
@@ -150,7 +148,7 @@ class VoysApiClient {
       body: { status },
       headers: { "Content-Type": "application/json" },
     });
-    if (response.status !== 200) {
+    if (response.status < 200 || response.status >= 300) {
       throw new Error(`Status wijzigen mislukt: HTTP ${response.status}`);
     }
     return response.data;
@@ -172,7 +170,7 @@ class VoysApiClient {
       body: { selected_destination: selectedDestination },
       headers: { "Content-Type": "application/json" },
     });
-    if (response.status !== 200 || !response.data) {
+    if (response.status < 200 || response.status >= 300) {
       throw new Error(`Bestemming wijzigen mislukt: HTTP ${response.status}`);
     }
     return response.data;

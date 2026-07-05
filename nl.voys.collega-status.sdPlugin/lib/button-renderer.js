@@ -1,39 +1,6 @@
-const { createCanvas } = (() => {
-  try { return require("canvas"); } catch { return { createCanvas: null }; }
-})();
-
-function generateStatusImage(color, label, size = 72) {
-  if (createCanvas) {
-    return generateWithCanvas(color, label, size);
-  }
+// Tekst op de knop komt via setTitle van Stream Deck zelf; wij leveren alleen de achtergrondkleur.
+function generateStatusImage(color, _label, size = 72) {
   return generateMinimalPng(color, size);
-}
-
-function generateWithCanvas(color, label, size) {
-  const canvas = createCanvas(size, size);
-  const ctx = canvas.getContext("2d");
-
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.roundRect(0, 0, size, size, 10);
-  ctx.fill();
-
-  if (label) {
-    ctx.fillStyle = "#FFFFFF";
-    ctx.font = `${Math.max(10, Math.floor(size / 5))}px "Inter", "Segoe UI", sans-serif`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-
-    const lines = label.split("\n");
-    const lineHeight = Math.floor(size / (lines.length + 1));
-    const startY = size / 2 - ((lines.length - 1) * lineHeight) / 2;
-
-    for (let i = 0; i < lines.length; i++) {
-      ctx.fillText(lines[i].substring(0, 8), size / 2, startY + i * lineHeight);
-    }
-  }
-
-  return canvas.toBuffer("image/png");
 }
 
 function generateMinimalPng(color, size) {

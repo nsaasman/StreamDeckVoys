@@ -21,10 +21,11 @@ const exclude = [
   "run_debug.bat",
 ];
 
+// Generieke patronen: geen letterlijke credentials in de repo zetten.
+// 40-hex = Voys API-token-formaat, UUID-formaat = client/user UUID's.
 const SENSITIVE_PATTERNS = [
-  /c8a4eb1f-8ad4-43f3-9b36-5fcad1f355b9/i,
-  /\b331969\b/,
-  /37946d0fd45cd52e334e6fb873fb52bc32d95c09/i,
+  /\b[0-9a-f]{40}\b/i,
+  /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i,
 ];
 
 function copyRecur(src, dst) {

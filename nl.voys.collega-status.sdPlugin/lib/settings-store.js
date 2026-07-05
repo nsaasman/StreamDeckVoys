@@ -4,20 +4,12 @@ class SettingsStore {
     this._actionSettings = new Map();
   }
 
-  getGlobal(key) {
-    return this._globalSettings[key];
-  }
-
   setGlobal(settings) {
     Object.assign(this._globalSettings, settings);
   }
 
   replaceGlobal(settings) {
     this._globalSettings = { ...settings };
-  }
-
-  clearGlobal() {
-    this._globalSettings = {};
   }
 
   getAction(context, key) {

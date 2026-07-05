@@ -35,6 +35,7 @@ const els = {
 };
 
 let loadedUsers = [];
+let savedUserUuid = null;
 
 function connectElgatoStreamDeckSocket(inPort, inPluginUUID, inRegisterEvent, inInfo, inActionInfo) {
   pluginUUID = inPluginUUID;
@@ -66,13 +67,6 @@ function connectElgatoStreamDeckSocket(inPort, inPluginUUID, inRegisterEvent, in
 
     if (msg.event === "sendToPropertyInspector") {
       handlePluginMessage(msg.payload || {});
-    }
-
-    if (msg.event === "propertyInspectorDidAppear") {
-      actionContext = msg.context;
-      if (msg.action) pluginAction = msg.action;
-      updatePiLayout();
-      requestActionSettings();
     }
   };
 
@@ -149,6 +143,8 @@ function loadGlobalSettings(settings) {
 }
 
 function loadActionSettings(settings) {
+  // Bewaar de keuze; de gebruikerslijst is meestal nog niet geladen als dit binnenkomt.
+  savedUserUuid = settings.userUuid || savedUserUuid;
   if (settings.userUuid && loadedUsers.length > 0) {
     els.colleagueSelect.value = settings.userUuid;
     showColleagueInfo(settings.userUuid);
@@ -216,6 +212,12 @@ function populateUsers(users) {
     opt.value = user.id;
     opt.textContent = user.name + (user.internal_number ? " (" + user.internal_number + ")" : "");
     els.colleagueSelect.appendChild(opt);
+  }
+
+  // Eerder opgeslagen collega terugzetten in de dropdown.
+  if (savedUserUuid && users.some((u) => u.id === savedUserUuid)) {
+    els.colleagueSelect.value = savedUserUuid;
+    showColleagueInfo(savedUserUuid);
   }
 }
 

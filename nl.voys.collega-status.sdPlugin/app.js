@@ -2,8 +2,18 @@ const { generateStatusImage } = require("./lib/button-renderer");
 
 const fs = require("fs");
 const path = require("path");
+
+const LOG_FILE = path.join(__dirname, "plugin.log");
+const DEBUG = process.env.VOYS_DEBUG === "1";
+// ponytail: geen rotatie, gewoon weggooien boven 5MB; rotatie toevoegen als iemand oude logs nodig heeft
+try { if (fs.statSync(LOG_FILE).size > 5 * 1024 * 1024) fs.unlinkSync(LOG_FILE); } catch {}
+
 function logError(msg) {
-  try { fs.appendFileSync(path.join(__dirname, "plugin.log"), `[${new Date().toISOString()}] ${msg}\n`); } catch {}
+  try { fs.appendFileSync(LOG_FILE, `[${new Date().toISOString()}] ${msg}\n`); } catch {}
+}
+
+function logDebug(msg) {
+  if (DEBUG) logError(msg);
 }
 
 function isSensitiveKey(key) {
@@ -84,8 +94,7 @@ const clickToDialClient = new ClickToDialClient(settingsStore);
 const statusService = new StatusService(settingsStore);
 
 let ws = null;
-let registrationInfo = null;
-let ownUserCache = null;
+let ownUserPromise = null;
 const callDebounce = new Map();
 const flashTimers = new Map();
 const unresolvedInternalNumbers = new Set();
@@ -110,7 +119,7 @@ function connect() {
   ws.on("message", (raw) => {
     try {
       const msg = JSON.parse(raw.toString());
-      logError(`WS RECV: ${JSON.stringify(sanitizeForLog(msg))}`);
+      logDebug(`WS RECV: ${JSON.stringify(sanitizeForLog(msg))}`);
       handleMessage(msg);
     } catch (err) {
       logError(`JSON Parse Error: ${err.message}`);
@@ -132,7 +141,7 @@ function send(context, payload) {
       const actionId = settingsStore.getAction(context, "_actionId");
       if (actionId) message.action = actionId;
     }
-    logError(`WS SEND: ${JSON.stringify(sanitizeForLog(message))}`);
+    logDebug(`WS SEND: ${JSON.stringify(sanitizeForLog(message))}`);
     ws.send(JSON.stringify(message));
   }
 }
@@ -192,7 +201,7 @@ function handleMessage(msg) {
 
 function handleGlobalSettings(settings) {
   settingsStore.replaceGlobal(settings);
-  ownUserCache = null;
+  ownUserPromise = null;
   unresolvedInternalNumbers.clear();
   statusService.setOwnUserUuid(null);
   const wasRunning = statusService.isRunning();
@@ -212,10 +221,6 @@ function handleActionSettings(context, settings) {
 }
 
 function handleWillAppear(context, payload, actionFromMsg) {
-  if (!registrationInfo) {
-    registrationInfo = payload?.settings;
-  }
-
   const actionId = actionFromMsg || payload?.action || ACTIONS.COLLEAGUE;
   const settings = payload?.settings || {};
   settingsStore.setAction(context, { ...settings, _actionId: actionId });
@@ -268,12 +273,11 @@ function handleKeyDown(context, actionFromMsg) {
   const settings = settingsStore.getAction(context);
   if (settings.userUuid) {
     callColleague(context);
-    statusService.forceRefresh();
   }
 }
 
 function handlePropertyInspectorMessage(context, payload) {
-  logError(`PI Message: ${JSON.stringify(sanitizeForLog(payload))}`);
+  logDebug(`PI Message: ${JSON.stringify(sanitizeForLog(payload))}`);
   const action = payload.action;
 
   if (payload.globalSettings) {
@@ -296,8 +300,9 @@ function handlePropertyInspectorMessage(context, payload) {
       
       const cached = statusService.getCachedStatus(actionData.userUuid);
       setButtonState(context, cached);
-      
-      statusService.forceRefresh();
+
+      // Nieuwe collega meteen normaliseren uit de al binnengekomen resgate-modellen.
+      statusService.recompute();
       break;
     }
 
@@ -349,11 +354,11 @@ function handlePropertyInspectorMessage(context, payload) {
     }
 
     case "fetchUserDetails": {
-      logError(`Starting fetchUserDetails...`);
+      logDebug(`Starting fetchUserDetails...`);
       apiClient
         .getUserDetails()
         .then((details) => {
-          logError(`fetchUserDetails success: ${JSON.stringify(details)}`);
+          logDebug(`fetchUserDetails success: ${JSON.stringify(details)}`);
           send(context, {
             event: "sendToPropertyInspector",
             payload: {
@@ -389,7 +394,7 @@ function handlePropertyInspectorMessage(context, payload) {
       };
       settingsStore.replaceGlobal(newSettings);
       saveGlobalSettings();
-      ownUserCache = null;
+      ownUserPromise = null;
       unresolvedInternalNumbers.clear();
       statusService.setOwnUserUuid(null);
       statusService.stop();
@@ -413,8 +418,18 @@ function extractEmail(payload) {
   return "";
 }
 
-async function getOwnUser() {
-  if (ownUserCache) return ownUserCache;
+function getOwnUser() {
+  // Promise cachen, niet het resultaat: N knoppen bij opstart = 1 auth-context call.
+  if (!ownUserPromise) {
+    ownUserPromise = fetchOwnUser().catch((err) => {
+      ownUserPromise = null;
+      throw err;
+    });
+  }
+  return ownUserPromise;
+}
+
+async function fetchOwnUser() {
   if (!settingsStore.getToken()) throw new Error("Geen API token");
   const ctx = await apiClient.getAuthContext();
   let email = extractEmail(ctx) || settingsStore.getClickToDialEmail();
@@ -426,14 +441,14 @@ async function getOwnUser() {
       logError(`getPersonalDetails for email failed: ${err.message}`);
     }
   }
-  ownUserCache = {
+  const user = {
     uuid: ctx.uuid,
     email,
     clientUuid: ctx.client_uuid || settingsStore.getClientUuid(),
     clientId: settingsStore.getClientId(),
   };
-  statusService.setOwnUserUuid(ownUserCache.uuid);
-  return ownUserCache;
+  statusService.setOwnUserUuid(user.uuid);
+  return user;
 }
 
 function pickInternalNumber(user) {
@@ -495,7 +510,7 @@ async function callColleague(context) {
       throw new Error("Geen e-mail — vul in onder Verbinding");
     }
     await clickToDialClient.initiateCall(user.email, settingsStore.getToken(), internalNumber);
-    logError(`Click-to-dial ok: ${internalNumber} callid pending`);
+    logDebug(`Click-to-dial ok: ${internalNumber} callid pending`);
   } catch (err) {
     logError(`Click-to-dial failed: ${err.message}`);
     const short = err.message.length > 18 ? `${err.message.slice(0, 17)}…` : err.message;
@@ -528,6 +543,17 @@ async function refreshAllCycleButtons() {
   }
 }
 
+function errorStatus(err) {
+  const msg = String(err?.message || "").toLowerCase();
+  const isAuth = msg.includes("auth") || msg.includes("401") || msg.includes("403");
+  return isAuth ? StatusNormalizer.getAuthError() : { ...StatusNormalizer.getUnknown(), label: "Fout" };
+}
+
+function showError(context, err) {
+  const status = errorStatus(err);
+  setButtonState(context, status, status.label);
+}
+
 async function refreshCycleStatusButton(context) {
   if (!settingsStore.getToken()) {
     setButtonState(context, StatusNormalizer.getConfig(), "Config");
@@ -537,8 +563,8 @@ async function refreshCycleStatusButton(context) {
     const user = await getOwnUser();
     const data = await apiClient.getUserStatus(user.clientUuid, user.uuid);
     setButtonState(context, statusDisplay(data.status), statusDisplay(data.status).label);
-  } catch {
-    setButtonState(context, StatusNormalizer.getAuthError(), "Fout");
+  } catch (err) {
+    showError(context, err);
   }
 }
 
@@ -550,9 +576,8 @@ async function cycleStatus(context) {
     const next = nextStatus(data.status);
     await apiClient.setUserStatus(user.clientUuid, user.uuid, next);
     setButtonState(context, statusDisplay(next), statusDisplay(next).label);
-    statusService.forceRefresh();
-  } catch {
-    setButtonState(context, StatusNormalizer.getAuthError(), "Fout");
+  } catch (err) {
+    showError(context, err);
   }
 }
 
@@ -572,8 +597,8 @@ async function refreshCycleDestinationButton(context) {
     const idx = findDestinationIndex(options, details.selected_destination);
     const current = options[idx >= 0 ? idx : 0];
     setButtonState(context, destinationDisplay(current.label), current.label);
-  } catch {
-    setButtonState(context, StatusNormalizer.getAuthError(), "Fout");
+  } catch (err) {
+    showError(context, err);
   }
 }
 
@@ -589,22 +614,33 @@ async function cycleDestination(context) {
     const next = options[(idx + 1) % options.length];
     await apiClient.setSelectedDestination(user.clientId, user.uuid, next.patch);
     setButtonState(context, destinationDisplay(next.label), next.label);
-  } catch {
-    setButtonState(context, StatusNormalizer.getAuthError(), "Fout");
+  } catch (err) {
+    showError(context, err);
   }
+}
+
+function dimColor(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  const dim = (c) => Math.floor(c * 0.45).toString(16).padStart(2, "0");
+  return `#${dim((n >> 16) & 255)}${dim((n >> 8) & 255)}${dim(n & 255)}`;
 }
 
 function setButtonState(context, status, titleOverride) {
   if (!context) return;
 
-  const state = status.state != null ? status.state : 4;
-  send(context, { event: "setState", payload: { state } });
+  // Cycle-acties hebben maar 1 state in het manifest; setState zou daar out-of-range zijn.
+  const actionId = settingsStore.getAction(context, "_actionId");
+  if (actionId !== ACTIONS.CYCLE_STATUS && actionId !== ACTIONS.CYCLE_DESTINATION) {
+    const state = status.state != null ? status.state : 4;
+    send(context, { event: "setState", payload: { state } });
+  }
 
   const title = titleOverride || buildTitle(status, context);
   send(context, { event: "setTitle", payload: { title, target: 0 } });
 
   try {
-    const imageData = generateStatusImage(status.color, title);
+    const color = status.stale ? dimColor(status.color) : status.color;
+    const imageData = generateStatusImage(color, title);
     if (imageData) {
       const base64 = imageData.toString("base64");
       send(context, {
