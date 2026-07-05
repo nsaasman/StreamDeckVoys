@@ -1,0 +1,20 @@
+{
+  "name": "nl.voys.collega-status",
+  "version": "1.0.0",
+  "description": "Stream Deck plugin voor Voys collega-status",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "build": "node scripts/package.js",
+    "build:release": "node scripts/package-release.js"
+  },
+  "author": "Community",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "adm-zip": "^0.5.16",
+    "archiver": "^8.0.0"
+  }
+}

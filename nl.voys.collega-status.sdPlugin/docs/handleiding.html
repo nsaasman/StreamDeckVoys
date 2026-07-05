@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voys Collega Status — Handleiding</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --surface: #1a2332;
+      --border: #2d3a4d;
+      --text: #e8edf4;
+      --muted: #9aa8b8;
+      --accent: #17a2b8;
+      --green: #28a745;
+      --red: #dc3545;
+      --yellow: #ffc107;
+      --gray: #6c757d;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    .wrap {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 4rem;
+    }
+
+    header {
+      margin-bottom: 2.5rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    h1 {
+      margin: 0 0 0.5rem;
+      font-size: 1.75rem;
+      font-weight: 600;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      margin: 0;
+    }
+
+    h2 {
+      margin: 2rem 0 0.75rem;
+      font-size: 1.2rem;
+      color: var(--accent);
+    }
+
+    h3 {
+      margin: 1.25rem 0 0.5rem;
+      font-size: 1rem;
+    }
+
+    p, li { color: var(--text); }
+    .muted { color: var(--muted); }
+
+    section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1rem;
+    }
+
+    ol, ul {
+      padding-left: 1.25rem;
+      margin: 0.5rem 0;
+    }
+
+    li { margin: 0.35rem 0; }
+
+    code, kbd {
+      background: #0d1117;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.1em 0.4em;
+      font-size: 0.9em;
+    }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 0.5rem;
+      margin: 0.75rem 0 0;
+    }
+
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.9rem;
+    }
+
+    .swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    .tip {
+      border-left: 3px solid var(--accent);
+      padding: 0.75rem 1rem;
+      background: rgba(23, 162, 184, 0.08);
+      border-radius: 0 6px 6px 0;
+      margin: 1rem 0 0;
+      font-size: 0.95rem;
+    }
+
+    .warn {
+      border-left-color: var(--yellow);
+      background: rgba(255, 193, 7, 0.08);
+    }
+
+    footer {
+      margin-top: 2rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Voys Collega Status</h1>
+      <p class="subtitle">Stream Deck-plugin — handleiding voor installatie en gebruik</p>
+    </header>
+
+    <section>
+      <h2>Wat doet deze plugin?</h2>
+      <p>
+        Met <strong>Voys Collega Status</strong> zie je op je Elgato Stream Deck de beschikbaarheid van
+        collega's uit je Voys-omgeving. Elke knop toont één collega met naam, status en optioneel het
+        interne nummer.
+      </p>
+      <p class="muted">
+        Statussen komen live binnen via de Voys Resgate-websocket — dezelfde bron die de officiële
+        Voys-app en webphone gebruiken voor collega-beschikbaarheid.
+      </p>
+    </section>
+
+    <section>
+      <h2>Vereisten</h2>
+      <ul>
+        <li><strong>Elgato Stream Deck</strong> versie 6.5 of nieuwer (Windows 10+ of macOS 10.15+)</li>
+        <li><strong>Node.js</strong> — wordt automatisch gebruikt door de plugin; installeer van <a href="https://nodejs.org/" target="_blank" rel="noopener">nodejs.org</a> als de plugin niet start</li>
+        <li>Een <strong>Voys-account</strong> met een geldig <strong>API-token</strong></li>
+        <li>Netwerktoegang tot <code>api.voys.nl</code> en <code>resgate.eu-production.holodeck.voys.nl</code></li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Installatie</h2>
+      <ol>
+        <li>Download het bestand <code>voys-collega-status.streamDeckPlugin</code>.</li>
+        <li>Dubbelklik het bestand — Stream Deck opent en installeert de plugin.</li>
+        <li>Sleep de actie <strong>Collega Status</strong> naar een vrije knop op je Stream Deck.</li>
+        <li>Klik op de knop om het instellingenvenster (Property Inspector) te openen.</li>
+      </ol>
+      <p class="tip">
+        Bij de eerste start installeert de plugin automatisch zijn Node.js-dependencies (<code>ws</code>).
+        Dat kan enkele seconden duren.
+      </p>
+    </section>
+
+    <section>
+      <h2>Configuratie — verbinding</h2>
+      <p>Stel eerst de globale verbinding in onder <strong>Verbinding</strong>:</p>
+
+      <h3>1. API-token invullen</h3>
+      <p>
+        Vul je persoonlijke Voys API-token in. Dit token koppel je aan je Voys-account en geeft
+        toegang tot collega's en statusinformatie binnen jouw organisatie.
+      </p>
+      <p class="tip warn">
+        Deel je API-token nooit publiek. Bewaar het alleen in Stream Deck via <strong>Opslaan</strong>.
+        Het token wordt lokaal opgeslagen in de Stream Deck-instellingen van jouw computer.
+      </p>
+
+      <h3>2. Client ID detecteren</h3>
+      <p>
+        Klik op <strong>Detecteer client_id</strong>. De plugin haalt automatisch je organisatie-ID
+        en client UUID op. Controleer of de velden <em>Client UUID</em> en <em>Client ID</em> zijn
+        ingevuld.
+      </p>
+
+      <h3>3. Verbinding testen</h3>
+      <p>
+        Klik op <strong>Test verbinding</strong>. Bij succes zie je <em>Token geldig</em>.
+        Klik daarna op <strong>Opslaan</strong> om de instellingen te bewaren.
+      </p>
+
+      <h3>Geavanceerde velden (meestal niet nodig)</h3>
+      <ul>
+        <li><strong>Voys API URL</strong> — standaard <code>https://api.voys.nl/api/v2</code></li>
+        <li><strong>Resgate URL</strong> — standaard <code>wss://resgate.eu-production.holodeck.voys.nl</code></li>
+        <li><strong>Click-to-Dial URL</strong> — standaard <code>https://api.voipgrid.nl/api/clicktodial</code></li>
+      </ul>
+      <p class="muted">Pas deze alleen aan als Voys andere endpoints heeft aangegeven voor jouw omgeving.</p>
+    </section>
+
+    <section>
+      <h2>Configuratie — collega per knop</h2>
+      <p>Elke Stream Deck-knop kan één collega tonen. Herhaal deze stappen per knop:</p>
+      <ol>
+        <li>Klik op <strong>Collega's laden</strong> om de lijst op te halen.</li>
+        <li>Kies een collega uit het dropdown-menu.</li>
+        <li>Pas optioneel de weergave aan: naam, status en/of intern nummer.</li>
+        <li>Klik op <strong>Opslaan voor deze knop</strong>.</li>
+      </ol>
+      <p class="tip">
+        Druk op een geconfigureerde knop om de collega te bellen (via je webphone/app) en de status te
+        verversen. Zorg dat de collega een intern nummer heeft.
+      </p>
+    </section>
+
+    <section>
+      <h2>Collega bellen</h2>
+      <p>
+        Bij indrukken van een geconfigureerde <strong>Collega Status</strong>-knop start de plugin een
+        uitgaand gesprek via de Voys <strong>Klik-en-bel</strong> API. Eerst gaat je eigen eindbestemming
+        over (webphone, app of toestel — zoals ingesteld in het Voys-portaal), daarna wordt het interne
+        nummer van de collega gebeld.
+      </p>
+      <h3>Vereisten</h3>
+      <ul>
+        <li>De collega heeft een <strong>intern nummer</strong> (zichtbaar na Collega's laden).</li>
+        <li>Je hebt een Klik-en-bel/eindbestemming ingesteld in Voys (zelfde instelling als de browserextensie).</li>
+        <li>Je webphone of app is actief als je via webphone/app belt.</li>
+        <li>Partneraccounts hebben geen toegang tot Klik-en-bel — alleen normale gebruikers.</li>
+      </ul>
+      <p class="muted">
+        De plugin gebruikt hetzelfde persoonlijke API-token als voor status; authenticatie voor bellen
+        verloopt via <code>Token e-mail:token</code> naar <code>api.voipgrid.nl</code>.
+      </p>
+    </section>
+
+    <section>
+      <h2>Statussen</h2>
+      <p>De knop toont één van de volgende statussen:</p>
+      <div class="status-grid">
+        <div class="status-item"><span class="swatch" style="background:#28A745"></span> Vrij</div>
+        <div class="status-item"><span class="swatch" style="background:#17A2B8"></span> Intern</div>
+        <div class="status-item"><span class="swatch" style="background:#DC3545"></span> Bezet</div>
+        <div class="status-item"><span class="swatch" style="background:#6C757D"></span> Offline</div>
+        <div class="status-item"><span class="swatch" style="background:#3A4754"></span> Onbekend</div>
+        <div class="status-item"><span class="swatch" style="background:#DC3545"></span> Auth</div>
+        <div class="status-item"><span class="swatch" style="background:#495057"></span> Config</div>
+      </div>
+      <ul style="margin-top:1rem">
+        <li><strong>Vrij</strong> — collega is bereikbaar</li>
+        <li><strong>Intern</strong> — alleen bereikbaar voor collega's</li>
+        <li><strong>Bezet</strong> — niet storen, in gesprek of aan het bellen</li>
+        <li><strong>Offline</strong> — niet ingelogd of geen actief toestel</li>
+        <li><strong>Config</strong> — knop nog niet geconfigureerd (geen collega gekozen)</li>
+        <li><strong>Auth</strong> — token ongeldig of geen toegang tot statusdienst</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Problemen oplossen</h2>
+
+      <h3>Knop toont "Config"</h3>
+      <p>Selecteer een collega en klik op <strong>Opslaan voor deze knop</strong>.</p>
+
+      <h3>Knop toont "Auth"</h3>
+      <ul>
+        <li>Controleer of het API-token nog geldig is in het Voys-portaal.</li>
+        <li>Klik op <strong>Test verbinding</strong> en daarna <strong>Opslaan</strong>.</li>
+        <li>Controleer of Client UUID en Client ID correct zijn (via <strong>Detecteer client_id</strong>).</li>
+      </ul>
+
+      <h3>Collega's laden mislukt</h3>
+      <ul>
+        <li>Token testen en opslaan.</li>
+        <li>Client ID handmatig invullen als detectie faalt (te vinden in het Voys-partnerportaal).</li>
+      </ul>
+
+      <h3>Status verandert niet</h3>
+      <ul>
+        <li>Druk op de knop om te verversen.</li>
+        <li>Herstart Stream Deck (plugin maakt automatisch opnieuw verbinding).</li>
+        <li>Controleer of de Resgate URL ongewijzigd is gelaten.</li>
+      </ul>
+
+      <h3>Bellen mislukt (fouttekst op knop)</h3>
+      <ul>
+        <li>Vul je <strong>E-mail (Klik-en-bel)</strong> in onder Verbinding en klik Opslaan.</li>
+        <li>Controleer je Klik-en-bel-instelling in het Voys-portaal (Telefooninstellingen).</li>
+        <li>Open je webphone of app vóór je op de knop drukt.</li>
+        <li>Partneraccounts kunnen Klik-en-bel niet gebruiken.</li>
+        <li>Logbestand: <code>plugin.log</code> in de plugin-map (map op de knop → Open in Explorer).</li>
+      </ul>
+
+      <h3>Knop toont "Geen nr"</h3>
+      <p>De gekozen collega heeft geen intern nummer. Kies een andere collega of vraag een beheerder om het interne nummer in Voys in te stellen.</p>
+
+      <h3>Plugin start niet</h3>
+      <ul>
+        <li>Installeer <a href="https://nodejs.org/" target="_blank" rel="noopener">Node.js</a> (LTS-versie).</li>
+        <li>Herinstalleer de plugin via het <code>.streamDeckPlugin</code>-bestand.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Privacy</h2>
+      <p>
+        De plugin slaat je API-token en instellingen lokaal op via Stream Deck. Alle communicatie
+        verloopt rechtstreeks tussen jouw computer en de Voys-API's — er worden geen gegevens
+        naar externe partijen gestuurd.
+      </p>
+    </section>
+
+    <footer>
+      <p>Voys Collega Status · versie 1.0.0</p>
+      <p class="muted">
+        Deze handleiding hoort bij de publieke release. Na installatie vind je een kopie in de
+        plugin-map onder <code>docs/handleiding.html</code>.
+      </p>
+    </footer>
+  </div>
+</body>
+</html>

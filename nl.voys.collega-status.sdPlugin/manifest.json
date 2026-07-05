@@ -1,0 +1,99 @@
+{
+  "UUID": "nl.voys.collega-status",
+  "SDKVersion": 2,
+  "Author": "Community",
+  "CodePathWin": "run.bat",
+  "CodePathMac": "run.sh",
+  "Description": "Toon de status van Voys-collega's op je Stream Deck.",
+  "Name": "Voys Collega Status",
+  "Icon": "icons/plugin",
+  "URL": "https://www.voys.nl",
+  "Version": "1.0.0",
+  "OS": [
+    {
+      "Platform": "mac",
+      "MinimumVersion": "10.15"
+    },
+    {
+      "Platform": "windows",
+      "MinimumVersion": "10"
+    }
+  ],
+  "Software": {
+    "MinimumVersion": "6.5"
+  },
+  "Category": "Voys",
+  "CategoryIcon": "icons/category",
+  "Actions": [
+    {
+      "Icon": "icons/action/key",
+      "Name": "Collega Status",
+      "States": [
+        {
+          "Image": "icons/action/available",
+          "TitleAlignment": "middle"
+        },
+        {
+          "Image": "icons/action/internal_only",
+          "TitleAlignment": "middle"
+        },
+        {
+          "Image": "icons/action/do_not_disturb",
+          "TitleAlignment": "middle"
+        },
+        {
+          "Image": "icons/action/offline",
+          "TitleAlignment": "middle"
+        },
+        {
+          "Image": "icons/action/unknown",
+          "TitleAlignment": "middle"
+        },
+        {
+          "Image": "icons/action/auth_error",
+          "TitleAlignment": "middle"
+        },
+        {
+          "Image": "icons/action/config",
+          "TitleAlignment": "middle"
+        },
+        {
+          "Image": "icons/action/missing",
+          "TitleAlignment": "middle"
+        }
+      ],
+      "Tooltip": "Toon status; indrukken belt collega (intern nummer).",
+      "SupportedInMultiActions": false,
+      "PropertyInspectorPath": "pi/index.html",
+      "UUID": "nl.voys.collega-status.colleague-status"
+    },
+    {
+      "Icon": "icons/action/key",
+      "Name": "Status wisselen",
+      "States": [
+        {
+          "Image": "icons/action/available",
+          "TitleAlignment": "middle"
+        }
+      ],
+      "Tooltip": "Wissel je eigen Voys-beschikbaarheid (Vrij → Intern → Bezet → Offline).",
+      "SupportedInMultiActions": false,
+      "PropertyInspectorPath": "pi/index.html",
+      "UUID": "nl.voys.collega-status.cycle-status"
+    },
+    {
+      "Icon": "icons/action/key",
+      "Name": "Bestemming wisselen",
+      "States": [
+        {
+          "Image": "icons/action/internal_only",
+          "TitleAlignment": "middle"
+        }
+      ],
+      "Tooltip": "Wissel waar je oproepen ontvangt (App → Webphone → Doorschakelen).",
+      "SupportedInMultiActions": false,
+      "PropertyInspectorPath": "pi/index.html",
+      "UUID": "nl.voys.collega-status.cycle-destination"
+    }
+  ]
+}

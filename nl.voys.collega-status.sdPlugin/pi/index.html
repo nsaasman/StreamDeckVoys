@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voys Collega Status</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="pi-container">
+    <!-- Global settings -->
+    <div class="pi-section" id="global-section">
+      <h2 class="pi-heading">Verbinding</h2>
+
+      <div class="field">
+        <label>Auth type</label>
+        <p class="field-value">Bearer token (Voys API)</p>
+      </div>
+
+      <div class="field">
+        <label for="api-token">API Token</label>
+        <div class="input-group">
+          <input type="password" id="api-token" placeholder="Voys API token" autocomplete="off" />
+          <button type="button" id="toggle-token" class="btn-sm btn-secondary" title="Toon/verberg">&#128065;</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="voys-base-url">Voys API URL</label>
+        <input type="text" id="voys-base-url" value="https://api.voys.nl/api/v2" />
+      </div>
+
+      <div class="field">
+        <label for="resgate-url">Resgate URL</label>
+        <input type="text" id="resgate-url" value="wss://resgate.eu-production.holodeck.voys.nl" />
+      </div>
+
+      <div class="field">
+        <label for="click-to-dial-url">Click-to-Dial URL</label>
+        <input type="text" id="click-to-dial-url" value="https://api.voipgrid.nl/api/clicktodial" />
+        <span class="field-hint">Voys Klik-en-bel API (meestal niet aanpassen).</span>
+      </div>
+
+      <div class="field">
+        <label for="user-email">E-mail (Klik-en-bel)</label>
+        <input type="email" id="user-email" placeholder="jij@bedrijf.nl" autocomplete="email" />
+        <span class="field-hint">Alleen nodig als bellen faalt; meestal automatisch uit je Voys-account.</span>
+      </div>
+
+      <div class="field">
+        <label for="client-uuid">Client UUID</label>
+        <input type="text" id="client-uuid" placeholder="UUID van je organisatie" value="" />
+      </div>
+
+      <div class="field">
+        <label for="client-id">Client ID (integer)</label>
+        <input type="text" id="client-id" placeholder="Integer client ID" value="" />
+        <span class="field-hint">Automatisch detecteerbaar via "Detecteer client_id".</span>
+      </div>
+
+      <div class="field">
+        <label for="polling-interval">Polling interval (seconden)</label>
+        <input type="number" id="polling-interval" value="15" min="5" max="300" />
+        <span class="field-hint">Reserve-instelling; status komt live via Resgate.</span>
+      </div>
+
+      <div class="button-bar">
+        <button type="button" id="btn-test-connection" class="btn btn-primary">Test verbinding</button>
+        <button type="button" id="btn-detect-client" class="btn btn-secondary">Detecteer client_id</button>
+        <button type="button" id="btn-save-global" class="btn btn-success">Opslaan</button>
+      </div>
+
+      <div id="connection-status" class="status-msg"></div>
+    </div>
+
+    <div class="pi-section" id="cycle-section" hidden>
+      <h2 class="pi-heading">Eigen knop</h2>
+      <p class="field-hint">Deze knop gebruikt je API-token en wisselt je eigen status of bestemming. Geen extra configuratie nodig.</p>
+    </div>
+
+    <!-- Per-action settings -->
+    <div class="pi-section" id="action-section">
+      <h2 class="pi-heading">Collega selectie</h2>
+      <div class="field">
+        <label for="colleague-select">Collega</label>
+        <select id="colleague-select">
+          <option value="">-- Laad eerst collega's --</option>
+        </select>
+      </div>
+
+      <div class="button-bar">
+        <button type="button" id="btn-load-colleagues" class="btn btn-secondary">Collega's laden</button>
+      </div>
+
+      <div id="colleague-info" class="colleague-info"></div>
+
+      <p class="field-hint">Knop indrukken belt de collega via je Voys Klik-en-bel-instelling (webphone/app). Vereist een intern nummer.</p>
+
+      <h3 class="pi-subheading">Weergave</h3>
+
+      <div class="field checkbox-field">
+        <input type="checkbox" id="show-name" checked />
+        <label for="show-name">Toon naam</label>
+      </div>
+
+      <div class="field checkbox-field">
+        <input type="checkbox" id="show-status" checked />
+        <label for="show-status">Toon status</label>
+      </div>
+
+      <div class="field checkbox-field">
+        <input type="checkbox" id="show-number" />
+        <label for="show-number">Toon intern nummer</label>
+      </div>
+
+      <div class="button-bar">
+        <button type="button" id="btn-save-action" class="btn btn-success">Opslaan voor deze knop</button>
+      </div>
+
+      <div id="action-status" class="status-msg"></div>
+    </div>
+
+    <!-- Status preview -->
+    <div class="pi-section" id="preview-section">
+      <h2 class="pi-heading">Status preview</h2>
+      <div id="status-preview" class="status-grid">
+        <div class="status-item"><span class="swatch" style="background:#5cb85c"></span> Vrij</div>
+        <div class="status-item"><span class="swatch" style="background:#007bff"></span> Intern</div>
+        <div class="status-item"><span class="swatch" style="background:#dc3545"></span> Bezet</div>
+        <div class="status-item"><span class="swatch" style="background:#8e8e8e"></span> Offline</div>
+        <div class="status-item"><span class="swatch" style="background:#454d63"></span> Onbekend</div>
+        <div class="status-item"><span class="swatch" style="background:#dc3545"></span> Auth fout</div>
+        <div class="status-item"><span class="swatch" style="background:#353c4d"></span> Config</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
