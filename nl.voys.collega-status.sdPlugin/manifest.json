@@ -8,7 +8,7 @@
   "Name": "Voys Collega Status",
   "Icon": "icons/plugin",
   "URL": "https://www.voys.nl",
-  "Version": "1.0.1",
+  "Version": "1.0.6",
   "OS": [
     {
       "Platform": "mac",

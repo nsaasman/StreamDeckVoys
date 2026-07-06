@@ -1,6 +1,6 @@
 {
   "name": "nl.voys.collega-status",
-  "version": "1.0.1",
+  "version": "1.0.6",
   "description": "Stream Deck plugin voor Voys collega-status",
   "main": "app.js",
   "scripts": {

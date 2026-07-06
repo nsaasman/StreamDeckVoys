@@ -103,7 +103,9 @@ const CALL_FEEDBACK_MS = 1500;
 
 function connect() {
   const port = IN_PORT > 0 ? IN_PORT : -1;
+  logError(`BOOT: pid=${process.pid} port=${port} uuid=${IN_PLUGIN_UUID} node=${process.version}`);
   if (port < 0) {
+    logError("BOOT ABORT: geen geldige Stream Deck port meegegeven");
     process.stderr.write("No valid Stream Deck port\n");
     process.exit(1);
   }
@@ -111,6 +113,7 @@ function connect() {
   ws = new WebSocket(`ws://127.0.0.1:${port}`);
 
   ws.on("open", () => {
+    logError("WS OPEN: verbonden met Stream Deck host");
     const event = IN_REGISTER_EVENT || "registerPlugin";
     ws.send(JSON.stringify({ event, uuid: IN_PLUGIN_UUID }));
     loadGlobalSettings();
@@ -401,6 +404,10 @@ function handlePropertyInspectorMessage(context, payload) {
       statusService.invalidate();
       statusService.start();
       refreshAllCycleButtons();
+      send(context, {
+        event: "sendToPropertyInspector",
+        payload: { action: "globalSaveResult" },
+      });
       break;
     }
 

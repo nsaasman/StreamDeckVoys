@@ -104,6 +104,20 @@ class VoysApiClient {
       };
     }
 
+    // ponytail: /clients/{uuid} is 403 for many user tokens; /user/{uuid}/details has client.id
+    if (clientResp.status === 403 && payload.uuid) {
+      const details = await this.getPersonalDetails(payload.uuid);
+      const client = details.client;
+      if (client?.id) {
+        return {
+          client: { id: client.id, uuid: client.uuid || clientUuid },
+          uuid: payload.uuid,
+          first_name: details.first_name || payload.first_name,
+          last_name: details.last_name || payload.last_name,
+        };
+      }
+    }
+
     if (clientResp.status === 403) {
       throw new Error("API token heeft onvoldoende rechten (403). Vul Client ID handmatig in.");
     }

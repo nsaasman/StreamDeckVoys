@@ -2,6 +2,7 @@ let websocket = null;
 let pluginUUID = null;
 let actionContext = null;
 let pluginAction = "nl.voys.collega-status.colleague-status";
+const MANIFEST_PLUGIN_UUID = "nl.voys.collega-status";
 
 const CYCLE_ACTIONS = new Set([
   "nl.voys.collega-status.cycle-status",
@@ -40,7 +41,10 @@ let savedUserUuid = null;
 function connectElgatoStreamDeckSocket(inPort, inPluginUUID, inRegisterEvent, inInfo, inActionInfo) {
   pluginUUID = inPluginUUID;
   const parsed = extractActionInfo(inActionInfo) || extractActionInfo(inInfo) || {};
-  actionContext = parsed.context;
+  // Een Property Inspector moet ZIJN EIGEN registratie-UUID (inPluginUUID) als context
+  // gebruiken voor setSettings/getSettings/sendToPlugin. De context uit actionInfo is de
+  // plugin-zijde context en wordt door de host niet geaccepteerd van de PI.
+  actionContext = inPluginUUID;
   if (parsed.action) pluginAction = parsed.action;
   updatePiLayout();
   const wsUrl = "ws://127.0.0.1:" + inPort;
@@ -61,7 +65,7 @@ function connectElgatoStreamDeckSocket(inPort, inPluginUUID, inRegisterEvent, in
     }
 
     if (msg.event === "didReceiveSettings") {
-      actionContext = msg.context;
+      // actionContext blijft de PI-registratie-UUID (inPluginUUID); niet overschrijven.
       loadActionSettings(msg.payload?.settings || {});
     }
 
@@ -104,9 +108,31 @@ function updatePiLayout() {
 function send(payload) {
   if (websocket && websocket.readyState === WebSocket.OPEN) {
     websocket.send(JSON.stringify(payload));
-  } else {
-    showStatus(els.connectionStatus, false, "Fout: Geen actieve verbinding. Heb je de knop net verwijderd of ben je via een debugger verbonden?");
+    return true;
   }
+  showStatus(els.connectionStatus, false, "Fout: Geen actieve verbinding. Herstart Stream Deck en open de instellingen opnieuw.");
+  return false;
+}
+
+function globalSettingsContext() {
+  return pluginUUID || MANIFEST_PLUGIN_UUID;
+}
+
+function saveGlobalSettingsToHost(settings) {
+  return send({
+    event: "setGlobalSettings",
+    context: globalSettingsContext(),
+    payload: settings,
+  });
+}
+
+function saveActionSettingsToHost(settings) {
+  if (!actionContext) return false;
+  return send({
+    event: "setSettings",
+    context: actionContext,
+    payload: settings,
+  });
 }
 
 function sendToPlugin(payload) {
@@ -124,7 +150,7 @@ function sendToPlugin(payload) {
 }
 
 function requestGlobalSettings() {
-  send({ event: "getGlobalSettings", context: pluginUUID });
+  send({ event: "getGlobalSettings", context: globalSettingsContext() });
 }
 
 function requestActionSettings() {
@@ -159,7 +185,8 @@ function handlePluginMessage(payload) {
     case "tokenResult":
       showStatus(els.connectionStatus, payload.valid, payload.valid ? "Token geldig" : payload.error);
       if (payload.valid && payload.data) {
-        setFieldValue(els.clientUuid, payload.data.client_uuid || "");
+        const data = payload.data.data || payload.data;
+        setFieldValue(els.clientUuid, data.client_uuid || "");
       }
       break;
 
@@ -174,16 +201,24 @@ function handlePluginMessage(payload) {
 
     case "userDetailsResult":
       if (payload.error) {
-        showStatus(els.connectionStatus, false, "client_id detectie: " + payload.error);
+        showStatus(els.connectionStatus, false, "Detectie: " + payload.error);
       } else if (payload.details) {
-        if (payload.details.clientId) {
-          els.clientId.value = payload.details.clientId;
-        }
         if (payload.details.clientUuid) {
           els.clientUuid.value = payload.details.clientUuid;
         }
-        showStatus(els.connectionStatus, true, "client_id gedetecteerd: " + payload.details.clientId);
+        if (payload.details.clientId) {
+          els.clientId.value = String(payload.details.clientId);
+        }
+        if (payload.details.clientId) {
+          showStatus(els.connectionStatus, true, "Gedetecteerd — client_id: " + payload.details.clientId);
+        } else {
+          showStatus(els.connectionStatus, true, "Client UUID ingevuld; Client ID handmatig invullen.");
+        }
       }
+      break;
+
+    case "globalSaveResult":
+      showStatus(els.connectionStatus, !payload.error, payload.error || "Opgeslagen en plugin bijgewerkt");
       break;
 
     default:
@@ -254,31 +289,93 @@ function collectGlobalSettings() {
   };
 }
 
+// Directe API-aanroepen vanuit de Property Inspector. Zo hangen test/detect/laden
+// niet af van de PI->plugin->host round-trip, die onbetrouwbaar bleek.
+const DEFAULT_VOYS_BASE = "https://api.voys.nl/api/v2";
+
+function voysBase() {
+  return els.voysBaseUrl.value.trim() || DEFAULT_VOYS_BASE;
+}
+
+async function voysGet(pathPart) {
+  const token = els.apiToken.value.trim();
+  if (!token) throw new Error("Vul eerst je API-token in.");
+  return fetch(voysBase() + pathPart, {
+    headers: { Authorization: "Bearer " + token, Accept: "application/json" },
+  });
+}
+
+function unwrap(body) {
+  return body && body.data !== undefined ? body.data : body;
+}
+
+function pickInternalNumber(user) {
+  if (!user) return "";
+  return String(
+    user.internal_number || user.internalNumber || user.extension || user.extension_number || ""
+  ).trim();
+}
+
 // Event handlers
 els.toggleToken.addEventListener("click", function () {
   els.apiToken.type = els.apiToken.type === "password" ? "text" : "password";
 });
 
-els.btnTestConnection.addEventListener("click", function () {
+els.btnTestConnection.addEventListener("click", async function () {
+  showStatus(els.connectionStatus, true, "Testen...");
   try {
-    showStatus(els.connectionStatus, true, "Testen...");
-    sendToPlugin({ action: "verifyToken", globalSettings: collectGlobalSettings() });
+    const res = await voysGet("/users/auth-context");
+    if (res.status === 401) return showStatus(els.connectionStatus, false, "Ongeldig token.");
+    if (res.status === 403) return showStatus(els.connectionStatus, false, "Geen toegang (403).");
+    if (!res.ok) return showStatus(els.connectionStatus, false, "HTTP " + res.status);
+    const data = unwrap(await res.json());
+    if (data.client_uuid) setFieldValue(els.clientUuid, data.client_uuid);
+    const naam = [data.first_name, data.last_name].filter(Boolean).join(" ");
+    showStatus(els.connectionStatus, true, "Token geldig" + (naam ? " — " + naam : ""));
   } catch (err) {
-    showStatus(els.connectionStatus, false, "UI Fout: " + err.message);
+    showStatus(els.connectionStatus, false, "Netwerkfout: " + err.message);
   }
 });
 
-els.btnDetectClient.addEventListener("click", function () {
+els.btnDetectClient.addEventListener("click", async function () {
+  showStatus(els.connectionStatus, true, "Detecteren...");
   try {
-    showStatus(els.connectionStatus, true, "Detecteren...");
-    sendToPlugin({ action: "fetchUserDetails", globalSettings: collectGlobalSettings() });
+    const ctxRes = await voysGet("/users/auth-context");
+    if (!ctxRes.ok) return showStatus(els.connectionStatus, false, "Auth-context HTTP " + ctxRes.status);
+    const ctx = unwrap(await ctxRes.json());
+    const clientUuid = ctx.client_uuid;
+    const userUuid = ctx.uuid;
+    if (clientUuid) setFieldValue(els.clientUuid, clientUuid);
+
+    let clientId = null;
+    const clientRes = await voysGet("/clients/" + clientUuid);
+    if (clientRes.ok) {
+      clientId = unwrap(await clientRes.json()).id;
+    } else if (clientRes.status === 403 && userUuid) {
+      // /clients/{uuid} is 403 voor veel user-tokens; /user/{uuid}/details heeft client.id
+      const detRes = await voysGet("/user/" + userUuid + "/details");
+      if (detRes.ok) clientId = (unwrap(await detRes.json()).client || {}).id;
+    }
+
+    if (clientId) {
+      els.clientId.value = String(clientId);
+      showStatus(els.connectionStatus, true, "Gedetecteerd — client_id: " + clientId);
+    } else {
+      showStatus(els.connectionStatus, true, "Client UUID ingevuld; Client ID handmatig invullen.");
+    }
   } catch (err) {
-    showStatus(els.connectionStatus, false, "UI Fout: " + err.message);
+    showStatus(els.connectionStatus, false, "Netwerkfout: " + err.message);
   }
 });
 
 els.btnSaveGlobal.addEventListener("click", function () {
   const settings = collectGlobalSettings();
+  if (!settings.api_token) {
+    showStatus(els.connectionStatus, false, "Vul eerst een API-token in");
+    return;
+  }
+  if (!saveGlobalSettingsToHost(settings)) return;
+  showStatus(els.connectionStatus, true, "Opgeslagen...");
   sendToPlugin({
     action: "saveGlobalToken",
     api_token: settings.api_token,
@@ -289,12 +386,32 @@ els.btnSaveGlobal.addEventListener("click", function () {
     click_to_dial_base_url: settings.click_to_dial_base_url,
     user_email: settings.user_email,
   });
-  showStatus(els.connectionStatus, true, "Opgeslagen");
 });
 
-els.btnLoadColleagues.addEventListener("click", function () {
+els.btnLoadColleagues.addEventListener("click", async function () {
   showStatus(els.actionStatus, true, "Laden...");
-  sendToPlugin({ action: "fetchUsers", globalSettings: collectGlobalSettings() });
+  const clientId = els.clientId.value.trim();
+  if (!clientId) {
+    return showStatus(els.actionStatus, false, "Vul/detecteer eerst het Client ID (bij Verbinding).");
+  }
+  try {
+    const res = await voysGet("/clients/" + clientId + "/users");
+    if (res.status === 401 || res.status === 403) return showStatus(els.actionStatus, false, "Geen toegang (HTTP " + res.status + ").");
+    if (!res.ok) return showStatus(els.actionStatus, false, "Laden mislukt: HTTP " + res.status);
+    const list = unwrap(await res.json());
+    const users = (Array.isArray(list) ? list : []).map(function (u) {
+      return {
+        id: u.uuid || u.id,
+        name: u.name || [u.first_name, u.last_name].filter(Boolean).join(" "),
+        email_address: u.email_address,
+        internal_number: pickInternalNumber(u),
+      };
+    });
+    populateUsers(users);
+    showStatus(els.actionStatus, true, users.length + " collega(s) geladen");
+  } catch (err) {
+    showStatus(els.actionStatus, false, "Netwerkfout: " + err.message);
+  }
 });
 
 els.colleagueSelect.addEventListener("change", function () {
@@ -313,14 +430,15 @@ els.btnSaveAction.addEventListener("click", function () {
   }
 
   const user = loadedUsers.find((u) => u.id === selectedUuid);
-  sendToPlugin({
-    action: "savePerAction",
+  const actionSettings = {
     userUuid: selectedUuid,
     displayName: user ? user.name : "",
     internalNumber: user ? user.internal_number : "",
     showName: els.showName.checked,
     showStatus: els.showStatus.checked,
     showNumber: els.showNumber.checked,
-  });
+  };
+  if (!saveActionSettingsToHost(actionSettings)) return;
+  sendToPlugin({ action: "savePerAction", ...actionSettings });
   showStatus(els.actionStatus, true, "Opgeslagen voor deze knop");
 });
